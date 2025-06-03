@@ -6,9 +6,7 @@ from api_electrolux.routers import (
 )
 
 app = FastAPI(
-    title="API Electrolux",version="0.0.1",
-    summary='Opa',
-    description='Oi'
+    title="API Electrolux",version="0.0.1"
 )
 
 app.include_router(auth.router)
