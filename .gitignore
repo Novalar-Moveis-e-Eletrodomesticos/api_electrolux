@@ -1,0 +1,63 @@
+# IDEs
+.vscode/
+.idea/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Packaging
+build/
+dist/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Test outputs
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.coverage*
+.cache
+
+# Logs
+logs/
+*.log
+
+# Databases
+db.sqlite3*
+*.db
+
+# Env files
+.env
+.env.*
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Type checker
+.mypy_cache/
+.pytype/
+.pyre/
+
+# Static analysis
+.dmypy.json
+.dmypy/
+
+# Documentation
+docs/_build/
+site/
+
+# Misc
+*.lock
+teste.*
+test.*
