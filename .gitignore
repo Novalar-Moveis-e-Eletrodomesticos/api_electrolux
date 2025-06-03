@@ -39,7 +39,7 @@ db.sqlite3*
 
 # Env files
 .env
-.env.*
+.env
 
 # Notebooks
 .ipynb_checkpoints/
