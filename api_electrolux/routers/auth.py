@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from http import HTTPStatus
+from typing import Annotated
 from common.security.security import create_access_token
 from api_electrolux.schemas.schema_auth import SchemaAuth, TokenResponse
 from common.db.db import db
 
+T_OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
 router = APIRouter(prefix='/auth', tags=['Auth'])
 
 def consultar_cliente(client_id: str):
@@ -20,8 +23,8 @@ def consultar_cliente(client_id: str):
         )
 
 @router.post('/login', response_model=TokenResponse, status_code=HTTPStatus.OK)
-def login(login: SchemaAuth):
-    resultados = consultar_cliente(login.client_id)
+def login(login: T_OAuth2Form):
+    resultados = consultar_cliente(login.username)
 
     if not resultados:
         raise HTTPException(
@@ -40,14 +43,14 @@ def login(login: SchemaAuth):
             detail='Formato inesperado de retorno da consulta'
         )
 
-    if db_client_secret != login.client_secret:
+    if db_client_secret != login.password:
         raise HTTPException(
             status_code=HTTPStatus.UNAUTHORIZED,
             detail='Credenciais inválidas'
         )
 
     token_data = {
-        "sub": login.client_id,
+        "sub": login.username,
         "name": db_client_name
     }
 
