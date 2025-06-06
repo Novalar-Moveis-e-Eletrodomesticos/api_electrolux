@@ -62,7 +62,7 @@ vendas_e_devolucao AS (
 tab_fim AS (
     SELECT
         vd.datamovimento AS data_sell_out,p.chave,
-        pe.cnpj_cpf,
+        COALESCE(pe.cnpj_cpf,pes.cnpj_cpf) AS cnpj_cpf,
         CASE
             WHEN vd.idprocessomestre = 9700 THEN 'online'
             ELSE 'offline'
@@ -113,12 +113,14 @@ tab_fim AS (
         AND ib.idgradex = p.idgradex AND ib.idgradey = p.idgradey AND ib.idproduto||'.'||ib.idgradex||'.'||ib.idgradey = p.chave
         order by ib.idfilial, sp.idsetorproduto, ib.idproduto, ib.idgradex, ib.idgradey, ib.idlocalsaldo, ib.datamovimento desc, ib.idmovimento desc, ib.iditembase desc
     ) ps ON TRUE
+    LEFT JOIN glb.filial ffs on ps.idfilial = ffs.idfilial
+    LEFT JOIN glb.pessoa pes on ffs.idcnpj_cpf = pes.idcnpj_cpf
     GROUP BY 1,2,3,4,5,6
 )
 
 SELECT
 data_sell_out,cnpj_cpf,tipo_cnpj,
-COALESCE(EAN,chave),quantidade,estoque
+COALESCE(EAN,chave) AS EAN,quantidade,estoque
 FROM tab_fim
 GROUP BY 1,2,3,4,5,6
 HAVING estoque > 0 OR quantidade > 0
