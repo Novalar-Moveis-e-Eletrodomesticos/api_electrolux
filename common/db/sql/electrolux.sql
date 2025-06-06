@@ -54,54 +54,71 @@ devolucao AS (
 ),
 
 vendas_e_devolucao AS (
-SELECT * FROM vendas
-UNION ALL
-SELECT * FROM devolucao
+    SELECT * FROM vendas
+    UNION ALL
+    SELECT * FROM devolucao
+),
+
+tab_fim AS (
+    SELECT
+        vd.datamovimento AS data_sell_out,p.chave,
+        pe.cnpj_cpf,
+        CASE
+            WHEN vd.idprocessomestre = 9700 THEN 'online'
+            ELSE 'offline'
+        END AS tipo_cnpj,
+        pgg.gtin AS EAN,
+        COALESCE(vd.quantidade,0) AS quantidade,
+        SUM(COALESCE(ps.saldo,0)) AS estoque
+    FROM (
+        SELECT
+            p.idmarca,m."descricao" AS marca,
+            p.idproduto,pg.idgradex,pg.idgradey,
+            p.idproduto||'.'||pg.idgradex||'.'||pg.idgradey AS chave,
+            p.descricao||', '||gx.descricao||', '||gy."descricao" AS descricao_sku,
+            pg.codigobarra,pg.codigofabricante
+        FROM glb.produto p
+        JOIN glb.produtograde pg on p.idproduto = pg.idproduto
+        JOIN glb.gradex gx on pg.idgradex = gx.idgradex
+        JOIN glb.gradey gy on pg.idgradey = gy.idgradey
+        JOIN glb.marca m on p.idmarca = m.idmarca
+        WHERE p.idmarca = :marca
+    ) p
+    LEFT JOIN glb.produtogradegtin pgg ON p.idproduto = pgg.idproduto AND p.idgradex = pgg.idgradex AND p.idgradey = pgg.idgradey AND pgg.padrao = 1
+    LEFT JOIN  LATERAL (
+        SELECT
+            vd.idfilial,vd.chave,vd.idproduto,
+            vd.idgradex,vd.idgradey,vd.idprocessomestre,
+            SUM(vd.totalpresente) AS totalpresente,
+            SUM(vd.quantidade) AS quantidade,
+            MAX(vd.datamovimento) AS datamovimento
+        FROM vendas_e_devolucao vd
+        WHERE vd.chave = p.chave AND vd.idproduto = p.idproduto AND vd.idgradex = p.idgradex AND vd.idgradey = p.idgradey
+        GROUP BY 1,2,3,4,5,6
+    ) vd ON TRUE
+    LEFT JOIN glb.filial f on vd.idfilial = f.idfilial
+    LEFT JOIN glb.pessoa pe on f.idcnpj_cpf = pe.idcnpj_cpf
+    LEFT JOIN LATERAL (
+        SELECT
+            DISTINCT ON (ib.idfilial, sp.idsetorproduto, ib.idproduto,ib.idgradex,ib.idgradey,ib.idlocalsaldo)
+            ib.idfilial,sp.descricao as grupo,ib.idproduto,
+            ib.idgradex,ib.idgradey,ib.quantidade,ib.totalcustomedio,
+            ib.saldo,ib.totalcustomedio
+        from rst.itembase ib
+        left join glb.produto pd on (ib.idproduto = pd.idproduto)
+        left join glb.produtograde pg on (pg.idproduto = ib.idproduto and pg.idgradex = ib.idgradex and pg.idgradey = ib.idgradey)
+        LEFT JOIN glb.setorproduto sp ON sp.idsetorproduto = pg.idsetorproduto     
+        where ib.idfilial = ANY(:filial) and ib.datamovimento <= :data_fin and ib.idoperacaoproduto > 0
+        and ib.idlocalsaldo = ANY(:idlocalsaldo) AND pd.idmarca = p.idmarca AND ib.idproduto = p.idproduto
+        AND ib.idgradex = p.idgradex AND ib.idgradey = p.idgradey AND ib.idproduto||'.'||ib.idgradex||'.'||ib.idgradey = p.chave
+        order by ib.idfilial, sp.idsetorproduto, ib.idproduto, ib.idgradex, ib.idgradey, ib.idlocalsaldo, ib.datamovimento desc, ib.idmovimento desc, ib.iditembase desc
+    ) ps ON TRUE
+    GROUP BY 1,2,3,4,5,6
 )
 
 SELECT
-    vd.datamovimento AS data_sell_out,
-    pe.cnpj_cpf,
-    CASE
-        WHEN vd.idprocessomestre = 9700 THEN 'online'
-        ELSE 'offline'
-    END AS tipo_cnpj,
-    pgg.gtin AS EAN,
-    SUM(vd.quantidade) AS quantidade,
-    SUM(ps.saldo) AS estoque
-FROM vendas_e_devolucao vd
-INNER JOIN glb.filial f on vd.idfilial = f.idfilial
-INNER JOIN glb.pessoa pe on f.idcnpj_cpf = pe.idcnpj_cpf
-JOIN LATERAL (
-    SELECT
-        p.idmarca,m."descricao" AS marca,
-        p.idproduto,pg.idgradex,pg.idgradey,
-        p.idproduto||'.'||pg.idgradex||'.'||pg.idgradey AS chave,
-        p.descricao||', '||gx.descricao||', '||gy."descricao" AS descricao_sku,
-        pg.codigobarra,pg.codigofabricante
-    FROM glb.produto p
-    JOIN glb.produtograde pg on p.idproduto = pg.idproduto
-    JOIN glb.gradex gx on pg.idgradex = gx.idgradex
-    JOIN glb.gradey gy on pg.idgradey = gy.idgradey
-    JOIN glb.marca m on p.idmarca = m.idmarca
-    WHERE p.idproduto = vd.idproduto AND pg.idgradex = vd.idgradex AND pg.idgradey = vd.idgradey
-    AND p.idproduto||'.'||pg.idgradex||'.'||pg.idgradey = vd.chave
-) p ON TRUE
-JOIN LATERAL (
-    SELECT
-        DISTINCT ON (ib.idfilial, sp.idsetorproduto, ib.idproduto,ib.idgradex,ib.idgradey,ib.idlocalsaldo)
-        ib.idfilial,sp.descricao as grupo,ib.idproduto,
-        ib.idgradex,ib.idgradey,ib.quantidade,ib.totalcustomedio,
-        ib.quantidade,ib.saldo,ib.totalcustomedio,ib.quantidade
-    from rst.itembase ib
-    left join glb.produto pd on (ib.idproduto = pd.idproduto)
-    left join glb.produtograde pg on (pg.idproduto = ib.idproduto and pg.idgradex = ib.idgradex and pg.idgradey = ib.idgradey)
-    LEFT JOIN glb.setorproduto sp ON sp.idsetorproduto = pg.idsetorproduto     
-    where ib.idfilial = ANY(:filial) and ib.datamovimento <= :data_fin and ib.idoperacaoproduto > 0
-    and ib.idlocalsaldo = ANY(:idlocalsaldo) AND pd.idmarca = p.idmarca AND ib.idproduto = vd.idproduto
-    AND ib.idgradex = vd.idgradex AND ib.idgradey = vd.idgradey AND ib.idproduto||'.'||ib.idgradex||'.'||ib.idgradey = vd.chave
-    order by ib.idfilial, sp.idsetorproduto, ib.idproduto, ib.idgradex, ib.idgradey, ib.idlocalsaldo, ib.datamovimento desc, ib.idmovimento desc, ib.iditembase desc
-) ps ON TRUE
-JOIN glb.produtogradegtin pgg ON vd.idproduto = pgg.idproduto AND vd.idgradex = pgg.idgradex AND vd.idgradey = pgg.idgradey AND pgg.padrao = 1
-WHERE p.idmarca = :marca
-GROUP BY 1,2,3,4
+data_sell_out,cnpj_cpf,tipo_cnpj,
+COALESCE(EAN,chave),quantidade,estoque
+FROM tab_fim
+GROUP BY 1,2,3,4,5,6
+HAVING estoque > 0 OR quantidade > 0
